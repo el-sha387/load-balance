@@ -303,6 +303,67 @@ function AsymmetryBar({ padL, padR, t }) {
   );
 }
 
+// ─── force bar chart ──────────────────────────────────────────────────────────
+function ForceBarChart({ padL, padR, saddle, mode, bodyWeightN, t }) {
+  const aPadL   = useAnimatedValue(padL);
+  const aPadR   = useAnimatedValue(padR);
+  const aSaddle = useAnimatedValue(saddle);
+
+  const toVal = (v) => mode === "percent"
+    ? (bodyWeightN > 0 ? (v / bodyWeightN) * 100 : 0)
+    : v;
+
+  const vals   = [toVal(aPadL), toVal(aPadR), toVal(aSaddle)];
+  const maxVal = Math.max(...vals, 1);
+  const H      = 90; // max bar height px
+  const labels = [t.left.substring(0,1)+"L", t.right.substring(0,1)+"R", t.saddleUp.substring(0,3)];
+  const colors = [C.green, C.green, C.blue];
+  const unit   = mode === "percent" ? "%" : "N";
+  const title  = mode === "percent" ? `% ${t.weight.toUpperCase()}` : "NEWTON";
+
+  return (
+    <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 12px 10px" }}>
+      <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textMute, letterSpacing:2, marginBottom:12, textAlign:"center" }}>
+        {title}
+      </div>
+      <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-around", height:H, gap:6 }}>
+        {vals.map((val, i) => {
+          const h = maxVal > 0 ? Math.max((val / maxVal) * H, 2) : 2;
+          return (
+            <div key={i} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, flex:1 }}>
+              {/* value label */}
+              <span style={{ fontFamily:"'DM Mono'", fontSize:9, color:colors[i], lineHeight:1 }}>
+                {mode === "percent" ? val.toFixed(0) : Math.round(val)}
+              </span>
+              {/* bar */}
+              <div style={{
+                width:"100%", height:h,
+                background:`linear-gradient(180deg, ${colors[i]}, ${colors[i]}88)`,
+                borderRadius:"4px 4px 2px 2px",
+                boxShadow:`0 0 8px ${colors[i]}44`,
+                transition:"height 0.05s",
+                minHeight:2,
+              }}/>
+            </div>
+          );
+        })}
+      </div>
+      {/* x-axis labels */}
+      <div style={{ display:"flex", justifyContent:"space-around", marginTop:6, gap:6 }}>
+        {labels.map((l, i) => (
+          <span key={i} style={{ fontFamily:"'DM Mono'", fontSize:8, color:colors[i], textAlign:"center", flex:1, letterSpacing:1 }}>
+            {l}
+          </span>
+        ))}
+      </div>
+      {/* unit */}
+      <div style={{ textAlign:"center", marginTop:4 }}>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:7, color:C.textMute, letterSpacing:1 }}>{unit}</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── total force ──────────────────────────────────────────────────────────────
 function TotalForce({ total, bodyWeightN }) {
   const aT  = useAnimatedValue(total);
@@ -478,24 +539,48 @@ export default function App() {
         <div style={{ width:"100%", maxWidth:420 }} className="si">
           <Header onBack={() => setScreen("input")} lang={lang} setLang={setLang} screenLabel={t.screenResult}/>
 
+          {/* ── Schematic ── */}
           <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"20px 14px 14px", marginBottom:12 }}>
             <Schematic saddleForce={saddle} padLForce={padL} padRForce={padR} maxForce={maxForce} t={t}/>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6, padding:"12px 12px 0", borderTop:`1px solid ${C.border}` }}>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:22, fontWeight:500, color:C.green, lineHeight:1 }}>{pctBWPads}%</div>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, marginTop:4, letterSpacing:1 }}>{t.padsKg}</div>
+
+            {/* Key metrics row */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginTop:10, padding:"14px 8px 0", borderTop:`1px solid ${C.border}` }}>
+              <div style={{ textAlign:"center", background:C.bgPage, borderRadius:10, padding:"12px 6px" }}>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, letterSpacing:1, marginBottom:6 }}>{t.padsKg}</div>
+                <div style={{ fontFamily:"'Bebas Neue'", fontSize:32, lineHeight:1, color:C.green }}>{pctBWPads}</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.greenDark, marginTop:2 }}>%</div>
               </div>
-              <TotalForce total={total} bodyWeightN={bodyWeightN}/>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:22, fontWeight:500, color:C.blue, lineHeight:1 }}>{pctBWSad}%</div>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, marginTop:4, letterSpacing:1 }}>{t.saddleKg}</div>
+              <div style={{ textAlign:"center", background:C.bgPage, borderRadius:10, padding:"12px 6px" }}>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, letterSpacing:1, marginBottom:6 }}>{t.totalForce}</div>
+                <div style={{ fontFamily:"'Bebas Neue'", fontSize:32, lineHeight:1, color:C.textPri }}>{Math.round(total)}</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.textMute, marginTop:2 }}>N</div>
+              </div>
+              <div style={{ textAlign:"center", background:C.bgPage, borderRadius:10, padding:"12px 6px" }}>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, letterSpacing:1, marginBottom:6 }}>{t.saddleKg}</div>
+                <div style={{ fontFamily:"'Bebas Neue'", fontSize:32, lineHeight:1, color:C.blue }}>{pctBWSad}</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.blueDark, marginTop:2 }}>%</div>
               </div>
             </div>
           </div>
 
-          <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 18px", marginBottom:12, display:"flex", flexDirection:"column", gap:16 }}>
+          {/* ── Distribution + Asymmetry ── */}
+          <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 18px", marginBottom:12, display:"flex", flexDirection:"column", gap:18 }}>
             <DistributionBar saddle={saddle} padL={padL} padR={padR} t={t}/>
             <AsymmetryBar padL={padL} padR={padR} t={t}/>
+          </div>
+
+          {/* ── Bar Charts ── */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+            {/* Chart 1: Absolute forces */}
+            <ForceBarChart
+              padL={padL} padR={padR} saddle={saddle}
+              mode="absolute" t={t}
+            />
+            {/* Chart 2: % body weight */}
+            <ForceBarChart
+              padL={padL} padR={padR} saddle={saddle}
+              mode="percent" bodyWeightN={bodyWeightN} t={t}
+            />
           </div>
 
           <button onClick={() => setScreen("input")}
