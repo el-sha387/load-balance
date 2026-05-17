@@ -1,8 +1,99 @@
 import { useState, useEffect, useRef } from "react";
 
+// ─── gebioMized brand colors ──────────────────────────────────────────────────
+const C = {
+  bgPage:    "#0b1525",
+  bgCard:    "#0f1e35",
+  bgInput:   "#0c1830",
+  border:    "#1a2d48",
+  borderSub: "#132038",
+  navy:      "#1e3054",
+  textPri:   "#dce8f6",
+  textSec:   "#4a6a8a",
+  textMute:  "#2a3f5a",
+  textFoot:  "#14202e",
+  green:     "#a8cc00",
+  greenDark: "#7a9600",
+  greenGlow: "#a8cc0033",
+  blue:      "#4a9fd4",
+  blueDark:  "#2e7ab0",
+  blueGlow:  "#4a9fd433",
+  cogLine:   "#e0ecf8",
+  cogGlow:   "#e0ecf855",
+  warnOk:    "#a8cc00",
+  warnMid:   "#f0b429",
+  warnBad:   "#e05555",
+};
+
+// ─── translations ─────────────────────────────────────────────────────────────
+const T = {
+  de: {
+    appSub:        "Kontaktpunkt-Lastverteilung",
+    screenInput:   "Eingabe",
+    screenResult:  "Ergebnis",
+    armpads:       "Armpads",
+    left:          "Links",
+    right:         "Rechts",
+    saddle:        "Sattel",
+    avgForce:      "Mittlere Kraft",
+    bodyweight:    "Körpergewicht",
+    weight:        "Gewicht",
+    analyze:       "AUSWERTEN →",
+    newMeasure:    "← NEUE MESSUNG",
+    padsKg:        "Pads / KG",
+    saddleKg:      "Sattel / KG",
+    totalForce:    "Gesamtkraft",
+    loadDist:      "Lastverteilung",
+    symm:          "SYMMETRISCH",
+    front:         "← VORNE",
+    rear:          "HINTEN →",
+    supportBase:   "STÜTZBASE",
+    cogLabel:      "CoG",
+    cogUnit:       "v. Sattel",
+    install:       "App installieren",
+    installSub:    "Homescreen · offline verfügbar",
+    installBtn:    "Installieren",
+    later:         "Später",
+    footer:        "© GEBIOMIZED · DYNAMISCHE DRUCKMESSUNG",
+    pads:          "PADS",
+    saddleUp:      "SATTEL",
+  },
+  en: {
+    appSub:        "Contact Point Load Distribution",
+    screenInput:   "Input",
+    screenResult:  "Results",
+    armpads:       "Arm Pads",
+    left:          "Left",
+    right:         "Right",
+    saddle:        "Saddle",
+    avgForce:      "Mean Force",
+    bodyweight:    "Body Weight",
+    weight:        "Weight",
+    analyze:       "ANALYZE →",
+    newMeasure:    "← NEW MEASUREMENT",
+    padsKg:        "Pads / BW",
+    saddleKg:      "Saddle / BW",
+    totalForce:    "Total Force",
+    loadDist:      "Load Distribution",
+    symm:          "SYMMETRIC",
+    front:         "← FRONT",
+    rear:          "REAR →",
+    supportBase:   "SUPPORT BASE",
+    cogLabel:      "CoG",
+    cogUnit:       "from saddle",
+    install:       "Install App",
+    installSub:    "Add to homescreen · works offline",
+    installBtn:    "Install",
+    later:         "Later",
+    footer:        "© GEBIOMIZED · DYNAMIC PRESSURE MEASUREMENT",
+    pads:          "PADS",
+    saddleUp:      "SADDLE",
+  },
+};
+
 const FONT = "https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap";
 
-/* ─── animated value hook ──────────────────────────────────────────────────── */
+// ─── animated value ───────────────────────────────────────────────────────────
 function useAnimatedValue(target, duration = 500) {
   const [value, setValue] = useState(target);
   const animRef = useRef(null);
@@ -24,18 +115,16 @@ function useAnimatedValue(target, duration = 500) {
   return value;
 }
 
-/* ─── PWA install prompt hook ──────────────────────────────────────────────── */
+// ─── PWA install prompt ───────────────────────────────────────────────────────
 function useInstallPrompt() {
   const [prompt, setPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
-
   useEffect(() => {
     const handler = (e) => { e.preventDefault(); setPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", () => setInstalled(true));
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
-
   const install = async () => {
     if (!prompt) return;
     prompt.prompt();
@@ -43,242 +132,273 @@ function useInstallPrompt() {
     if (outcome === "accepted") setInstalled(true);
     setPrompt(null);
   };
-
-  return { canInstall: !!prompt && !installed, install, installed };
+  return { canInstall: !!prompt && !installed, install };
 }
 
-/* ─── schematic constants ───────────────────────────────────────────────────── */
-const X_PAD = 88;
-const X_SAD = 316;
-const BASELINE_Y = 148;
-const MAX_ARROW = 90;
+// ─── language toggle ──────────────────────────────────────────────────────────
+function LangToggle({ lang, setLang }) {
+  return (
+    <div style={{ display:"flex", background:C.bgPage, border:`1px solid ${C.border}`, borderRadius:8, overflow:"hidden", flexShrink:0 }}>
+      {["de","en"].map(l => (
+        <button key={l} onClick={() => setLang(l)}
+          style={{
+            padding:"6px 12px",
+            fontFamily:"'DM Mono'", fontSize:11, fontWeight:500,
+            letterSpacing:1, textTransform:"uppercase",
+            border:"none", cursor:"pointer",
+            background: lang === l ? C.green : "transparent",
+            color:      lang === l ? C.bgPage : C.textSec,
+            transition: "all 0.15s",
+          }}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-/* ─── schematic svg ─────────────────────────────────────────────────────────── */
-function Schematic({ saddleForce, padLForce, padRForce, maxForce }) {
+// ─── schematic ────────────────────────────────────────────────────────────────
+const X_PAD = 88, X_SAD = 316, BASELINE_Y = 148, MAX_ARROW = 90;
+
+function Schematic({ saddleForce, padLForce, padRForce, maxForce, t }) {
   const padForce = padLForce + padRForce;
   const total    = saddleForce + padForce;
+  const cogX     = total > 0 ? (X_PAD * padForce + X_SAD * saddleForce) / total : (X_PAD + X_SAD) / 2;
 
-  const cogX = total > 0
-    ? (X_PAD * padForce + X_SAD * saddleForce) / total
-    : (X_PAD + X_SAD) / 2;
-
-  const animCogX  = useAnimatedValue(cogX);
-  const animSad   = useAnimatedValue(saddleForce);
-  const animPad   = useAnimatedValue(padForce);
-  const animPadL  = useAnimatedValue(padLForce);
-  const animPadR  = useAnimatedValue(padRForce);
+  const animCogX = useAnimatedValue(cogX);
+  const animSad  = useAnimatedValue(saddleForce);
+  const animPad  = useAnimatedValue(padForce);
+  const animPadL = useAnimatedValue(padLForce);
+  const animPadR = useAnimatedValue(padRForce);
 
   const hSad  = maxForce > 0 ? (animSad  / maxForce) * MAX_ARROW : 0;
   const hPad  = maxForce > 0 ? (animPad  / maxForce) * MAX_ARROW : 0;
   const hPadL = maxForce > 0 ? (animPadL / maxForce) * MAX_ARROW : 0;
   const hPadR = maxForce > 0 ? (animPadR / maxForce) * MAX_ARROW : 0;
-
-  const cogPctFromRear = total > 0
-    ? ((X_SAD - animCogX) / (X_SAD - X_PAD) * 100)
-    : 50;
-
+  const cogPct = total > 0 ? ((X_SAD - animCogX) / (X_SAD - X_PAD) * 100) : 50;
   const AW = 5;
 
   return (
-    <svg viewBox="0 0 404 200" style={{ width: "100%", maxWidth: 404, overflow: "visible" }}>
+    <svg viewBox="0 0 404 200" style={{ width:"100%", maxWidth:404, overflow:"visible" }}>
       <defs>
         <filter id="gy" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="4" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <filter id="gt" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="3.5" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        <filter id="gg" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <filter id="gr" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="3.5" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        <filter id="gb" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
 
       {/* axis */}
-      <line x1="48" y1={BASELINE_Y} x2="360" y2={BASELINE_Y} stroke="#1e3550" strokeWidth="1.5" />
-      <line x1="48"  y1={BASELINE_Y-6} x2="48"  y2={BASELINE_Y+6} stroke="#1e3550" strokeWidth="1.5" />
-      <line x1="360" y1={BASELINE_Y-6} x2="360" y2={BASELINE_Y+6} stroke="#1e3550" strokeWidth="1.5" />
-      <text x="200" y={BASELINE_Y+16} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill="#1e3550" letterSpacing="2">
-        ← VORNE · HINTEN →
+      <line x1="48" y1={BASELINE_Y} x2="360" y2={BASELINE_Y} stroke={C.navy} strokeWidth="1.5"/>
+      <line x1="48"  y1={BASELINE_Y-6} x2="48"  y2={BASELINE_Y+6} stroke={C.navy} strokeWidth="1.5"/>
+      <line x1="360" y1={BASELINE_Y-6} x2="360" y2={BASELINE_Y+6} stroke={C.navy} strokeWidth="1.5"/>
+      <text x="200" y={BASELINE_Y+16} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill={C.navy} letterSpacing="2">
+        {t.front} · {t.rear}
       </text>
 
-      {/* distance bracket */}
-      <line x1={X_PAD} y1={BASELINE_Y+28} x2={X_SAD} y2={BASELINE_Y+28} stroke="#182840" strokeWidth="1" />
-      <line x1={X_PAD} y1={BASELINE_Y+24} x2={X_PAD} y2={BASELINE_Y+32} stroke="#182840" strokeWidth="1" />
-      <line x1={X_SAD} y1={BASELINE_Y+24} x2={X_SAD} y2={BASELINE_Y+32} stroke="#182840" strokeWidth="1" />
-      <text x={(X_PAD+X_SAD)/2} y={BASELINE_Y+42} textAnchor="middle" fontFamily="DM Mono" fontSize="7.5" fill="#243c56" letterSpacing="1">
-        STÜTZBASE
+      {/* bracket */}
+      <line x1={X_PAD} y1={BASELINE_Y+28} x2={X_SAD} y2={BASELINE_Y+28} stroke={C.borderSub} strokeWidth="1"/>
+      <line x1={X_PAD} y1={BASELINE_Y+24} x2={X_PAD} y2={BASELINE_Y+32} stroke={C.borderSub} strokeWidth="1"/>
+      <line x1={X_SAD} y1={BASELINE_Y+24} x2={X_SAD} y2={BASELINE_Y+32} stroke={C.borderSub} strokeWidth="1"/>
+      <text x={(X_PAD+X_SAD)/2} y={BASELINE_Y+42} textAnchor="middle" fontFamily="DM Mono" fontSize="7.5" fill={C.textMute} letterSpacing="1">
+        {t.supportBase}
       </text>
 
-      {/* pad point */}
-      <line x1={X_PAD} y1={BASELINE_Y-hPad-8} x2={X_PAD} y2={BASELINE_Y} stroke="#4ecdc420" strokeWidth="1" strokeDasharray="3 3" />
-      <circle cx={X_PAD} cy={BASELINE_Y} r="5" fill="#0c1824" stroke="#4ecdc4" strokeWidth="2" filter={padForce>0?"url(#gt)":""} />
+      {/* pads */}
+      <line x1={X_PAD} y1={BASELINE_Y-hPad-8} x2={X_PAD} y2={BASELINE_Y} stroke={C.greenGlow} strokeWidth="1" strokeDasharray="3 3"/>
+      <circle cx={X_PAD} cy={BASELINE_Y} r="5" fill={C.bgCard} stroke={C.green} strokeWidth="2" filter={padForce>0?"url(#gg)":""}/>
       {hPad > 2 && (
-        <g filter="url(#gt)">
-          <line x1={X_PAD} y1={BASELINE_Y-5} x2={X_PAD} y2={BASELINE_Y-hPad+AW+2} stroke="#4ecdc4" strokeWidth="2" strokeLinecap="round" />
-          <polygon points={`${X_PAD},${BASELINE_Y-5} ${X_PAD-AW},${BASELINE_Y-5-AW*1.8} ${X_PAD+AW},${BASELINE_Y-5-AW*1.8}`} fill="#4ecdc4" />
+        <g filter="url(#gg)">
+          <line x1={X_PAD} y1={BASELINE_Y-5} x2={X_PAD} y2={BASELINE_Y-hPad+AW+2} stroke={C.green} strokeWidth="2" strokeLinecap="round"/>
+          <polygon points={`${X_PAD},${BASELINE_Y-5} ${X_PAD-AW},${BASELINE_Y-5-AW*1.8} ${X_PAD+AW},${BASELINE_Y-5-AW*1.8}`} fill={C.green}/>
         </g>
       )}
-      <text x={X_PAD} y={BASELINE_Y-hPad-14} textAnchor="middle" fontFamily="DM Mono" fontSize="11" fontWeight="500" fill="#4ecdc4">
-        {Math.round(animPad)}
-      </text>
-      <text x={X_PAD} y={BASELINE_Y-hPad-4} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill="#4ecdc499">N</text>
-      <text x={X_PAD} y={BASELINE_Y+14} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill="#4ecdc4" letterSpacing="1">PADS</text>
+      <text x={X_PAD} y={BASELINE_Y-hPad-14} textAnchor="middle" fontFamily="DM Mono" fontSize="11" fontWeight="500" fill={C.green}>{Math.round(animPad)}</text>
+      <text x={X_PAD} y={BASELINE_Y-hPad-4}  textAnchor="middle" fontFamily="DM Mono" fontSize="8"  fill={C.greenDark}>N</text>
+      <text x={X_PAD} y={BASELINE_Y+14}       textAnchor="middle" fontFamily="DM Mono" fontSize="8"  fill={C.green} letterSpacing="1">{t.pads}</text>
 
-      {/* L/R split bars */}
+      {/* L/R split */}
       {(padLForce>0||padRForce>0) && (
-        <g opacity="0.7">
-          <rect x={X_PAD-22} y={BASELINE_Y-hPadL*0.3-2} width="8" height={hPadL*0.3+2} rx="2" fill="#4ecdc433" stroke="#4ecdc4" strokeWidth="0.8" />
-          <text x={X_PAD-18} y={BASELINE_Y-hPadL*0.3-6} textAnchor="middle" fontFamily="DM Mono" fontSize="7" fill="#4ecdc488">L</text>
-          <rect x={X_PAD+14} y={BASELINE_Y-hPadR*0.3-2} width="8" height={hPadR*0.3+2} rx="2" fill="#4ecdc433" stroke="#4ecdc4" strokeWidth="0.8" />
-          <text x={X_PAD+18} y={BASELINE_Y-hPadR*0.3-6} textAnchor="middle" fontFamily="DM Mono" fontSize="7" fill="#4ecdc488">R</text>
+        <g opacity="0.65">
+          <rect x={X_PAD-22} y={BASELINE_Y-hPadL*0.3-2} width="8" height={hPadL*0.3+2} rx="2" fill={C.greenGlow} stroke={C.green} strokeWidth="0.8"/>
+          <text x={X_PAD-18} y={BASELINE_Y-hPadL*0.3-6} textAnchor="middle" fontFamily="DM Mono" fontSize="7" fill={C.greenDark}>L</text>
+          <rect x={X_PAD+14} y={BASELINE_Y-hPadR*0.3-2} width="8" height={hPadR*0.3+2} rx="2" fill={C.greenGlow} stroke={C.green} strokeWidth="0.8"/>
+          <text x={X_PAD+18} y={BASELINE_Y-hPadR*0.3-6} textAnchor="middle" fontFamily="DM Mono" fontSize="7" fill={C.greenDark}>R</text>
         </g>
       )}
 
-      {/* saddle point */}
-      <line x1={X_SAD} y1={BASELINE_Y-hSad-8} x2={X_SAD} y2={BASELINE_Y} stroke="#ff6b6b20" strokeWidth="1" strokeDasharray="3 3" />
-      <circle cx={X_SAD} cy={BASELINE_Y} r="5" fill="#0c1824" stroke="#ff6b6b" strokeWidth="2" filter={saddleForce>0?"url(#gr)":""} />
+      {/* saddle */}
+      <line x1={X_SAD} y1={BASELINE_Y-hSad-8} x2={X_SAD} y2={BASELINE_Y} stroke={C.blueGlow} strokeWidth="1" strokeDasharray="3 3"/>
+      <circle cx={X_SAD} cy={BASELINE_Y} r="5" fill={C.bgCard} stroke={C.blue} strokeWidth="2" filter={saddleForce>0?"url(#gb)":""}/>
       {hSad > 2 && (
-        <g filter="url(#gr)">
-          <line x1={X_SAD} y1={BASELINE_Y-5} x2={X_SAD} y2={BASELINE_Y-hSad+AW+2} stroke="#ff6b6b" strokeWidth="2" strokeLinecap="round" />
-          <polygon points={`${X_SAD},${BASELINE_Y-5} ${X_SAD-AW},${BASELINE_Y-5-AW*1.8} ${X_SAD+AW},${BASELINE_Y-5-AW*1.8}`} fill="#ff6b6b" />
+        <g filter="url(#gb)">
+          <line x1={X_SAD} y1={BASELINE_Y-5} x2={X_SAD} y2={BASELINE_Y-hSad+AW+2} stroke={C.blue} strokeWidth="2" strokeLinecap="round"/>
+          <polygon points={`${X_SAD},${BASELINE_Y-5} ${X_SAD-AW},${BASELINE_Y-5-AW*1.8} ${X_SAD+AW},${BASELINE_Y-5-AW*1.8}`} fill={C.blue}/>
         </g>
       )}
-      <text x={X_SAD} y={BASELINE_Y-hSad-14} textAnchor="middle" fontFamily="DM Mono" fontSize="11" fontWeight="500" fill="#ff6b6b">
-        {Math.round(animSad)}
-      </text>
-      <text x={X_SAD} y={BASELINE_Y-hSad-4} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill="#ff6b6b99">N</text>
-      <text x={X_SAD} y={BASELINE_Y+14} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill="#ff6b6b" letterSpacing="1">SATTEL</text>
+      <text x={X_SAD} y={BASELINE_Y-hSad-14} textAnchor="middle" fontFamily="DM Mono" fontSize="11" fontWeight="500" fill={C.blue}>{Math.round(animSad)}</text>
+      <text x={X_SAD} y={BASELINE_Y-hSad-4}  textAnchor="middle" fontFamily="DM Mono" fontSize="8"  fill={C.blueDark}>N</text>
+      <text x={X_SAD} y={BASELINE_Y+14}       textAnchor="middle" fontFamily="DM Mono" fontSize="8"  fill={C.blue} letterSpacing="1">{t.saddleUp}</text>
 
       {/* CoG */}
-      <rect x={X_PAD} y={BASELINE_Y-4} width={X_SAD-X_PAD} height="8" fill="#f7c94806" />
-      <line x1={animCogX} y1="8" x2={animCogX} y2={BASELINE_Y+22} stroke="#f7c948" strokeWidth="1.5" strokeDasharray="6 4" filter="url(#gy)" />
-      <polygon points={`${animCogX},${BASELINE_Y+5} ${animCogX-6},${BASELINE_Y-5} ${animCogX+6},${BASELINE_Y-5}`} fill="#f7c948" opacity="0.9" filter="url(#gy)" />
-      <rect x={animCogX-24} y="0" width="48" height="16" rx="4" fill="#080f18" stroke="#f7c94838" strokeWidth="1" />
-      <text x={animCogX} y="11" textAnchor="middle" fontFamily="DM Mono" fontSize="8.5" fill="#f7c948" letterSpacing="2">CoG</text>
-      <text x={animCogX} y={BASELINE_Y+22} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill="#f7c94880">
-        {`${cogPctFromRear.toFixed(0)}% v. Sattel`}
+      <rect x={X_PAD} y={BASELINE_Y-4} width={X_SAD-X_PAD} height="8" fill="#e0ecf808"/>
+      <line x1={animCogX} y1="8" x2={animCogX} y2={BASELINE_Y+22} stroke={C.cogLine} strokeWidth="1.5" strokeDasharray="6 4" filter="url(#gy)"/>
+      <polygon points={`${animCogX},${BASELINE_Y+5} ${animCogX-6},${BASELINE_Y-5} ${animCogX+6},${BASELINE_Y-5}`} fill={C.cogLine} opacity="0.9" filter="url(#gy)"/>
+      <rect x={animCogX-24} y="0" width="48" height="16" rx="4" fill={C.bgPage} stroke={C.cogGlow} strokeWidth="1"/>
+      <text x={animCogX} y="11" textAnchor="middle" fontFamily="DM Mono" fontSize="8.5" fill={C.cogLine} letterSpacing="2">{t.cogLabel}</text>
+      <text x={animCogX} y={BASELINE_Y+22} textAnchor="middle" fontFamily="DM Mono" fontSize="8" fill={`${C.cogLine}88`}>
+        {`${cogPct.toFixed(0)}% ${t.cogUnit}`}
       </text>
     </svg>
   );
 }
 
-/* ─── distribution bar ──────────────────────────────────────────────────────── */
-function DistributionBar({ saddle, padL, padR }) {
+// ─── distribution bar ─────────────────────────────────────────────────────────
+function DistributionBar({ saddle, padL, padR, t }) {
   const total = saddle + padL + padR;
   const sP = useAnimatedValue(total > 0 ? (saddle / total) * 100 : 50);
   const pP = useAnimatedValue(total > 0 ? ((padL + padR) / total) * 100 : 50);
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
-        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:"#4ecdc4", letterSpacing:1 }}>PADS {pP.toFixed(1)}%</span>
-        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:"#2a4060", letterSpacing:1 }}>LASTVERTEILUNG</span>
-        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:"#ff6b6b", letterSpacing:1 }}>SATTEL {sP.toFixed(1)}%</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.green,    letterSpacing:1 }}>{t.pads} {pP.toFixed(1)}%</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.textMute, letterSpacing:1 }}>{t.loadDist.toUpperCase()}</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.blue,     letterSpacing:1 }}>{t.saddleUp} {sP.toFixed(1)}%</span>
       </div>
-      <div style={{ height:10, borderRadius:5, background:"#060c14", overflow:"hidden", display:"flex", border:"1px solid #0d1c2c" }}>
-        <div style={{ width:`${pP}%`, background:"linear-gradient(90deg,#1a7a74,#4ecdc4)", transition:"width 0.05s" }} />
-        <div style={{ flex:1, background:"linear-gradient(90deg,#bb2c2c,#ff6b6b)" }} />
+      <div style={{ height:10, borderRadius:5, background:C.bgPage, overflow:"hidden", display:"flex", border:`1px solid ${C.border}` }}>
+        <div style={{ width:`${pP}%`, background:`linear-gradient(90deg,${C.greenDark},${C.green})`, transition:"width 0.05s" }}/>
+        <div style={{ flex:1, background:`linear-gradient(90deg,${C.blueDark},${C.blue})` }}/>
       </div>
     </div>
   );
 }
 
-/* ─── asymmetry bar ─────────────────────────────────────────────────────────── */
-function AsymmetryBar({ padL, padR }) {
+// ─── asymmetry bar ────────────────────────────────────────────────────────────
+function AsymmetryBar({ padL, padR, t }) {
   const total = padL + padR;
-  const asym = useAnimatedValue(total > 0 ? ((padL - padR) / total) * 100 : 0);
-  const abs = Math.abs(asym);
-  const color = abs < 5 ? "#4ecdc4" : abs < 10 ? "#f7c948" : "#ff6b6b";
-  const label = abs < 3 ? "SYMMETRISCH" : asym > 0 ? `L +${abs.toFixed(1)}%` : `R +${abs.toFixed(1)}%`;
+  const asym  = useAnimatedValue(total > 0 ? ((padL - padR) / total) * 100 : 0);
+  const abs   = Math.abs(asym);
+  const color = abs < 5 ? C.warnOk : abs < 10 ? C.warnMid : C.warnBad;
+  const label = abs < 3
+    ? t.symm
+    : asym > 0
+      ? `${t.left.toUpperCase()} +${abs.toFixed(1)}%`
+      : `${t.right.toUpperCase()} +${abs.toFixed(1)}%`;
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
-        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:"#2a4060", letterSpacing:1 }}>LINKS</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.textMute, letterSpacing:1 }}>{t.left.toUpperCase()}</span>
         <span style={{ fontFamily:"'DM Mono'", fontSize:10, color, letterSpacing:1 }}>{label}</span>
-        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:"#2a4060", letterSpacing:1 }}>RECHTS</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:10, color:C.textMute, letterSpacing:1 }}>{t.right.toUpperCase()}</span>
       </div>
-      <div style={{ height:6, borderRadius:3, background:"#060c14", overflow:"hidden", position:"relative", border:"1px solid #0d1c2c" }}>
-        <div style={{ position:"absolute", left:"50%", width:1, height:"100%", background:"#182840" }} />
-        <div style={{ position:"absolute", top:0, height:"100%", left:asym>=0?"50%":`${50+asym/2}%`, width:`${Math.abs(asym)/2}%`, background:color, boxShadow:`0 0 6px ${color}80`, transition:"all 0.05s" }} />
+      <div style={{ height:6, borderRadius:3, background:C.bgPage, overflow:"hidden", position:"relative", border:`1px solid ${C.border}` }}>
+        <div style={{ position:"absolute", left:"50%", width:1, height:"100%", background:C.border }}/>
+        <div style={{ position:"absolute", top:0, height:"100%", left:asym>=0?"50%":`${50+asym/2}%`, width:`${abs/2}%`, background:color, boxShadow:`0 0 6px ${color}80`, transition:"all 0.05s" }}/>
       </div>
     </div>
   );
 }
 
-/* ─── input field ───────────────────────────────────────────────────────────── */
-function InputField({ label, value, onChange, color, unit = "N" }) {
+// ─── total force ──────────────────────────────────────────────────────────────
+function TotalForce({ total, bodyWeightN }) {
+  const aT  = useAnimatedValue(total);
+  const pct = bodyWeightN > 0 ? (aT / bodyWeightN) * 100 : null;
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-      <label style={{ fontFamily:"'DM Sans'", fontSize:9, fontWeight:500, color:"#2a4060", letterSpacing:"2px", textTransform:"uppercase" }}>
-        {label}
-      </label>
+    <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+      <span style={{ fontFamily:"'Bebas Neue'", fontSize:40, lineHeight:1, color:C.textPri, letterSpacing:2 }}>{Math.round(aT)}</span>
+      <span style={{ fontFamily:"'DM Mono'", fontSize:12, color:C.textMute }}>N</span>
+      {pct !== null && <>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:11, color:C.textMute, marginLeft:4 }}>·</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:12, color:`${C.green}99` }}>{pct.toFixed(0)}%</span>
+      </>}
+    </div>
+  );
+}
+
+// ─── install banner ───────────────────────────────────────────────────────────
+function InstallBanner({ onInstall, t }) {
+  const [v, setV] = useState(true);
+  if (!v) return null;
+  return (
+    <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:12, padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+      <div>
+        <div style={{ fontFamily:"'DM Sans'", fontSize:13, color:C.textPri, fontWeight:500 }}>{t.install}</div>
+        <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, marginTop:2, letterSpacing:1 }}>{t.installSub}</div>
+      </div>
+      <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+        <button onClick={() => setV(false)} style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", fontFamily:"'DM Mono'", fontSize:11, color:C.textSec, cursor:"pointer" }}>{t.later}</button>
+        <button onClick={onInstall} style={{ background:C.green, border:"none", borderRadius:8, padding:"8px 14px", fontFamily:"'DM Mono'", fontSize:11, color:C.bgPage, fontWeight:500, cursor:"pointer" }}>{t.installBtn}</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── big input ────────────────────────────────────────────────────────────────
+function BigInputField({ label, value, onChange, color, unit = "N", sublabel }) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline" }}>
+        <label style={{ fontFamily:"'DM Sans'", fontSize:11, fontWeight:500, color:C.textSec, letterSpacing:"2px", textTransform:"uppercase" }}>{label}</label>
+        {sublabel && <span style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, letterSpacing:1 }}>{sublabel}</span>}
+      </div>
       <div style={{ position:"relative" }}>
         <input
           type="number" value={value}
           onChange={e => onChange(Number(e.target.value) || 0)}
-          min={0} max={unit==="kg"?200:999}
-          style={{ width:"100%", background:"#060c14", border:`1px solid ${color}44`, borderRadius:6, padding:"9px 28px 9px 10px", fontFamily:"'DM Mono'", fontSize:15, fontWeight:500, color:"#c8d8e8", outline:"none", boxSizing:"border-box" }}
+          inputMode="numeric" min={0} max={unit==="kg"?200:999}
+          style={{ width:"100%", background:C.bgInput, border:`1.5px solid ${color}55`, borderRadius:10, padding:"16px 44px 16px 16px", fontFamily:"'DM Mono'", fontSize:28, fontWeight:500, color:C.textPri, outline:"none", boxSizing:"border-box" }}
           onFocus={e => e.target.style.borderColor = color}
-          onBlur={e  => e.target.style.borderColor = `${color}44`}
+          onBlur={e  => e.target.style.borderColor = `${color}55`}
         />
-        <span style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", fontFamily:"'DM Mono'", fontSize:9.5, color:"#2a4060" }}>{unit}</span>
+        <span style={{ position:"absolute", right:14, top:"50%", transform:"translateY(-50%)", fontFamily:"'DM Mono'", fontSize:13, color:`${color}88` }}>{unit}</span>
       </div>
     </div>
   );
 }
 
-/* ─── total force ───────────────────────────────────────────────────────────── */
-function TotalForce({ total, bodyWeightN }) {
-  const aT = useAnimatedValue(total);
-  const pct = bodyWeightN > 0 ? (aT / bodyWeightN) * 100 : null;
+// ─── header ───────────────────────────────────────────────────────────────────
+function Header({ onBack, lang, setLang, screenLabel }) {
   return (
-    <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
-      <span style={{ fontFamily:"'Bebas Neue'", fontSize:40, lineHeight:1, color:"#c8d8e8", letterSpacing:2 }}>{Math.round(aT)}</span>
-      <span style={{ fontFamily:"'DM Mono'", fontSize:12, color:"#2a4060" }}>N</span>
-      {pct !== null && (
-        <>
-          <span style={{ fontFamily:"'DM Mono'", fontSize:11, color:"#2a4060", marginLeft:4 }}>·</span>
-          <span style={{ fontFamily:"'DM Mono'", fontSize:12, color:"#f7c94880" }}>{pct.toFixed(0)}% KG</span>
-        </>
+    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20, paddingBottom:14, borderBottom:`1px solid ${C.border}` }}>
+      {onBack && (
+        <button onClick={onBack} style={{ background:"none", border:`1px solid ${C.border}`, borderRadius:8, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 3L5 8L10 13" stroke={C.textSec} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
       )}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+          <span style={{ fontFamily:"'Bebas Neue'", fontSize:24, letterSpacing:4, color:C.textPri }}>GEBIOMIZED</span>
+          <span style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textMute, letterSpacing:2 }}>LOAD BALANCE</span>
+        </div>
+        <div style={{ fontFamily:"'DM Sans'", fontSize:10, color:C.textMute, letterSpacing:1, marginTop:1 }}>
+          {screenLabel}
+        </div>
+      </div>
+      <LangToggle lang={lang} setLang={setLang}/>
     </div>
   );
 }
 
-/* ─── install banner ────────────────────────────────────────────────────────── */
-function InstallBanner({ onInstall }) {
-  const [visible, setVisible] = useState(true);
-  if (!visible) return null;
-  return (
-    <div style={{ background:"#0d1c2c", border:"1px solid #1e3550", borderRadius:10, padding:"10px 14px", marginBottom:12, display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
-      <div>
-        <div style={{ fontFamily:"'DM Sans'", fontSize:12, color:"#c8d8e8", fontWeight:500 }}>App installieren</div>
-        <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:"#2a4060", marginTop:2, letterSpacing:1 }}>Zum Homescreen hinzufügen · offline verfügbar</div>
-      </div>
-      <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-        <button onClick={() => setVisible(false)}
-          style={{ background:"none", border:"1px solid #1e3550", borderRadius:6, padding:"5px 10px", fontFamily:"'DM Mono'", fontSize:10, color:"#2a4060", cursor:"pointer" }}>
-          Später
-        </button>
-        <button onClick={onInstall}
-          style={{ background:"#f7c948", border:"none", borderRadius:6, padding:"5px 12px", fontFamily:"'DM Mono'", fontSize:10, color:"#060c14", fontWeight:500, cursor:"pointer" }}>
-          Installieren
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ─── app ───────────────────────────────────────────────────────────────────── */
+// ─── app ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [saddle, setSaddle] = useState(280);
   const [padL,   setPadL]   = useState(120);
   const [padR,   setPadR]   = useState(115);
   const [bw,     setBw]     = useState(75);
+  const [screen, setScreen] = useState("input");
+  const [lang,   setLang]   = useState(() => {
+    const nav = navigator.language || "de";
+    return nav.startsWith("de") ? "de" : "en";
+  });
 
   const { canInstall, install } = useInstallPrompt();
+  const t = T[lang];
 
   const bodyWeightN = bw * 9.81;
   const total       = saddle + padL + padR;
@@ -286,73 +406,105 @@ export default function App() {
   const pctBWSad    = bodyWeightN > 0 ? ((saddle        / bodyWeightN) * 100).toFixed(0) : "—";
   const pctBWPads   = bodyWeightN > 0 ? (((padL + padR) / bodyWeightN) * 100).toFixed(0) : "—";
 
+  const css = `
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html,body { height:100%; background:${C.bgPage}; }
+    @keyframes slideIn  { from{opacity:0;transform:translateX(28px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes slideOut { from{opacity:0;transform:translateX(-28px)} to{opacity:1;transform:translateX(0)} }
+    .si { animation:slideIn  0.28s ease; }
+    .so { animation:slideOut 0.28s ease; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
+    input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+  `;
+
+  const wrap = {
+    minHeight:"100dvh",
+    background:`radial-gradient(ellipse at 15% 12%, #0e2040 0%, ${C.bgPage} 55%)`,
+    display:"flex", alignItems:"flex-start", justifyContent:"center",
+    padding:"max(env(safe-area-inset-top),20px) 20px max(env(safe-area-inset-bottom),24px)",
+    overflowY:"auto",
+  };
+
+  /* INPUT */
+  if (screen === "input") return (
+    <>
+      <link rel="stylesheet" href={FONT}/>
+      <style>{css}</style>
+      <div style={wrap}>
+        <div style={{ width:"100%", maxWidth:420 }} className="so">
+          {canInstall && <InstallBanner onInstall={install} t={t}/>}
+          <Header lang={lang} setLang={setLang} screenLabel={t.appSub}/>
+
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"18px 16px" }}>
+              <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.green, letterSpacing:3, marginBottom:14 }}>{t.armpads.toUpperCase()}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <BigInputField label={t.left}  value={padL} onChange={setPadL} color={C.green}/>
+                <BigInputField label={t.right} value={padR} onChange={setPadR} color={C.green}/>
+              </div>
+            </div>
+
+            <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"18px 16px" }}>
+              <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.blue, letterSpacing:3, marginBottom:14 }}>{t.saddle.toUpperCase()}</div>
+              <BigInputField label={t.avgForce} value={saddle} onChange={setSaddle} color={C.blue}/>
+            </div>
+
+            <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"18px 16px" }}>
+              <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textSec, letterSpacing:3, marginBottom:14 }}>{t.bodyweight.toUpperCase()}</div>
+              <BigInputField label={t.weight} value={bw} onChange={setBw} color={C.textSec} unit="kg" sublabel={`= ${bodyWeightN.toFixed(0)} N`}/>
+            </div>
+
+            <button onClick={() => setScreen("results")}
+              style={{ width:"100%", background:C.green, border:"none", borderRadius:12, padding:"18px", fontFamily:"'Bebas Neue'", fontSize:20, letterSpacing:4, color:C.bgPage, cursor:"pointer", marginTop:4 }}>
+              {t.analyze}
+            </button>
+          </div>
+
+          <div style={{ marginTop:20, textAlign:"center" }}>
+            <span style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textFoot, letterSpacing:2 }}>{t.footer}</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  /* RESULTS */
   return (
     <>
-      <link rel="stylesheet" href={FONT} />
-      <style>{`
-        * { box-sizing:border-box; margin:0; padding:0; }
-        html, body { height:100%; background:#060c14; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
-        input[type=number] { -moz-appearance:textfield; appearance:textfield; }
-      `}</style>
+      <link rel="stylesheet" href={FONT}/>
+      <style>{css}</style>
+      <div style={wrap}>
+        <div style={{ width:"100%", maxWidth:420 }} className="si">
+          <Header onBack={() => setScreen("input")} lang={lang} setLang={setLang} screenLabel={t.screenResult}/>
 
-      <div style={{ minHeight:"100vh", minHeight:"100dvh", background:"radial-gradient(ellipse at 15% 15%,#0c1e34 0%,#060c14 55%)", display:"flex", alignItems:"center", justifyContent:"center", padding:"env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px)" }}>
-        <div style={{ width:"100%", maxWidth:420, animation:"fadeIn 0.4s ease" }}>
-
-          {/* install banner */}
-          {canInstall && <InstallBanner onInstall={install} />}
-
-          {/* header */}
-          <div style={{ marginBottom:18, paddingBottom:13, borderBottom:"1px solid #0d1c2c" }}>
-            <div style={{ display:"flex", alignItems:"baseline", gap:10 }}>
-              <span style={{ fontFamily:"'Bebas Neue'", fontSize:26, letterSpacing:5, color:"#c8d8e8" }}>LOAD BALANCE</span>
-              <span style={{ fontFamily:"'DM Mono'", fontSize:8, color:"#2a4060", letterSpacing:3 }}>TRIATHLON</span>
-            </div>
-            <div style={{ fontFamily:"'DM Sans'", fontSize:10, color:"#2a4060", letterSpacing:1, marginTop:1 }}>
-              Kontaktpunkt-Lastverteilung · gebioMized
-            </div>
-          </div>
-
-          {/* schematic */}
-          <div style={{ background:"#080f18", border:"1px solid #0d1c2c", borderRadius:14, padding:"20px 14px 14px", marginBottom:12 }}>
-            <Schematic saddleForce={saddle} padLForce={padL} padRForce={padR} maxForce={maxForce} />
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6, padding:"10px 12px 0", borderTop:"1px solid #0d1c2c" }}>
+          <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"20px 14px 14px", marginBottom:12 }}>
+            <Schematic saddleForce={saddle} padLForce={padL} padRForce={padR} maxForce={maxForce} t={t}/>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:6, padding:"12px 12px 0", borderTop:`1px solid ${C.border}` }}>
               <div style={{ textAlign:"center" }}>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:18, fontWeight:500, color:"#4ecdc4", lineHeight:1 }}>{pctBWPads}%</div>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:"#2a4060", marginTop:3, letterSpacing:1 }}>Pads / KG</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:22, fontWeight:500, color:C.green, lineHeight:1 }}>{pctBWPads}%</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, marginTop:4, letterSpacing:1 }}>{t.padsKg}</div>
               </div>
-              <TotalForce total={total} bodyWeightN={bodyWeightN} />
+              <TotalForce total={total} bodyWeightN={bodyWeightN}/>
               <div style={{ textAlign:"center" }}>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:18, fontWeight:500, color:"#ff6b6b", lineHeight:1 }}>{pctBWSad}%</div>
-                <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:"#2a4060", marginTop:3, letterSpacing:1 }}>Sattel / KG</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:22, fontWeight:500, color:C.blue, lineHeight:1 }}>{pctBWSad}%</div>
+                <div style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, marginTop:4, letterSpacing:1 }}>{t.saddleKg}</div>
               </div>
             </div>
           </div>
 
-          {/* bars */}
-          <div style={{ background:"#080f18", border:"1px solid #0d1c2c", borderRadius:14, padding:"14px 16px", marginBottom:12, display:"flex", flexDirection:"column", gap:14 }}>
-            <DistributionBar saddle={saddle} padL={padL} padR={padR} />
-            <AsymmetryBar padL={padL} padR={padR} />
+          <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"16px 18px", marginBottom:12, display:"flex", flexDirection:"column", gap:16 }}>
+            <DistributionBar saddle={saddle} padL={padL} padR={padR} t={t}/>
+            <AsymmetryBar padL={padL} padR={padR} t={t}/>
           </div>
 
-          {/* inputs */}
-          <div style={{ background:"#080f18", border:"1px solid #0d1c2c", borderRadius:14, padding:"14px" }}>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:10 }}>
-              <InputField label="Pad L" value={padL} onChange={setPadL} color="#4ecdc4" />
-              <InputField label="Sattel" value={saddle} onChange={setSaddle} color="#ff6b6b" />
-              <InputField label="Pad R" value={padR} onChange={setPadR} color="#38b8b0" />
-              <InputField label="KG" value={bw} onChange={setBw} color="#f7c948" unit="kg" />
-            </div>
-            <div style={{ marginTop:10, paddingTop:10, borderTop:"1px solid #0d1c2c", display:"flex", justifyContent:"space-between" }}>
-              <span style={{ fontFamily:"'DM Mono'", fontSize:9, color:"#1e3050", letterSpacing:1 }}>KÖRPERGEWICHT</span>
-              <span style={{ fontFamily:"'DM Mono'", fontSize:9, color:"#f7c94860", letterSpacing:1 }}>{bw} kg · {bodyWeightN.toFixed(0)} N</span>
-            </div>
-          </div>
+          <button onClick={() => setScreen("input")}
+            style={{ width:"100%", background:"none", border:`1px solid ${C.border}`, borderRadius:12, padding:"16px", fontFamily:"'Bebas Neue'", fontSize:18, letterSpacing:4, color:C.textSec, cursor:"pointer" }}>
+            {t.newMeasure}
+          </button>
 
-          <div style={{ marginTop:12, textAlign:"center" }}>
-            <span style={{ fontFamily:"'DM Mono'", fontSize:8, color:"#182030", letterSpacing:2 }}>© GEBIOMIZED · DYNAMISCHE DRUCKMESSUNG</span>
+          <div style={{ marginTop:16, textAlign:"center" }}>
+            <span style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textFoot, letterSpacing:2 }}>{t.footer}</span>
           </div>
         </div>
       </div>
