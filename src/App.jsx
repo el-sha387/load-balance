@@ -313,11 +313,12 @@ function ForceBarChart({ padL, padR, saddle, mode, bodyWeightN, t }) {
     ? (bodyWeightN > 0 ? (v / bodyWeightN) * 100 : 0)
     : v;
 
-  const vals   = [toVal(aPadL), toVal(aPadR), toVal(aSaddle)];
+  const padForce = aPadL + aPadR;
+  const vals   = [toVal(padForce), toVal(aSaddle)];
   const maxVal = Math.max(...vals, 1);
-  const H      = 90; // max bar height px
-  const labels = [t.left.substring(0,1)+"L", t.right.substring(0,1)+"R", t.saddleUp.substring(0,3)];
-  const colors = [C.green, C.green, C.blue];
+  const H      = 90;
+  const labels = [t.pads, t.saddleUp];
+  const colors = [C.green, C.blue];
   const unit   = mode === "percent" ? "%" : "N";
   const title  = mode === "percent" ? `% ${t.weight.toUpperCase()}` : "NEWTON";
 
