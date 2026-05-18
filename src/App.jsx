@@ -80,6 +80,7 @@ const T = {
     mmUnit:"mm", secUnit:"s",
     cogShifts:"SHIFTS", cogShiftsUp:"↑ UPWARD", cogShiftsDown:"↓ DOWNWARD",
     cogThreshold:"Threshold",
+  },
 };
 
 const FONT = "https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap";
