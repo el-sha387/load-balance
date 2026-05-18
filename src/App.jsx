@@ -43,8 +43,9 @@ const T = {
     cogRear:"HINTEN",
     cogCenter:"Mitte",
     cogNewFile:"NEUE DATEI",
-    mmUnit:"mm",
-    secUnit:"s",
+    mmUnit:"mm", secUnit:"s",
+    cogShifts:"SHIFTS", cogShiftsUp:"↑ OBEN", cogShiftsDown:"↓ UNTEN",
+    cogThreshold:"Schwelle",
   },
   en: {
     appSub:"Contact Point Load Distribution", screenInput:"Input", screenResult:"Results",
@@ -76,9 +77,9 @@ const T = {
     cogRear:"REAR",
     cogCenter:"Center",
     cogNewFile:"NEW FILE",
-    mmUnit:"mm",
-    secUnit:"s",
-  },
+    mmUnit:"mm", secUnit:"s",
+    cogShifts:"SHIFTS", cogShiftsUp:"↑ UPWARD", cogShiftsDown:"↓ DOWNWARD",
+    cogThreshold:"Threshold",
 };
 
 const FONT = "https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap";
@@ -166,7 +167,187 @@ function buildHeatmap(points, dim, cols = 36, rows = 52) {
   return { grid, cW, cH, maxCount, cols, rows };
 }
 
-// ─── SaddleHeatmap SVG ────────────────────────────────────────────────────────
+function buildTimeSeries(points, nBins = 350) {
+  if (points.length === 0) return [];
+  const t0 = points[0].ms, t1 = points[points.length - 1].ms;
+  const binSize = (t1 - t0) / nBins;
+  const bins = Array.from({ length: nBins }, () => ({ sum: 0, count: 0 }));
+  for (const p of points) {
+    const idx = Math.min(Math.floor((p.ms - t0) / binSize), nBins - 1);
+    bins[idx].sum += p.y;
+    bins[idx].count++;
+  }
+  return bins
+    .map((b, i) => ({ t: (t0 + i * binSize) / 1000, y: b.count > 0 ? b.sum / b.count : null }))
+    .filter(p => p.y !== null);
+}
+
+function detectShifts(series, meanY, threshold) {
+  const upper = meanY + threshold;
+  const lower = meanY - threshold;
+  let shiftsUp = 0, shiftsDown = 0;
+  let wasAbove = series[0]?.y > upper;
+  let wasBelow = series[0]?.y < lower;
+  for (let i = 1; i < series.length; i++) {
+    const above = series[i].y > upper;
+    const below = series[i].y < lower;
+    if (above && !wasAbove) shiftsUp++;
+    if (below && !wasBelow) shiftsDown++;
+    wasAbove = above; wasBelow = below;
+  }
+  return { shiftsUp, shiftsDown, total: shiftsUp + shiftsDown };
+}
+
+function CogYTimePlot({ data, threshold, t }) {
+  const series = buildTimeSeries(data.points);
+  if (series.length === 0) return null;
+
+  const upper = data.meanY + threshold;
+  const lower = data.meanY - threshold;
+  const shifts = detectShifts(series, data.meanY, threshold);
+
+  const PAD = { l: 28, r: 10, t: 16, b: 22 };
+  const W = 360, H = 120;
+  const innerW = W - PAD.l - PAD.r;
+  const innerH = H - PAD.t - PAD.b;
+
+  const tMin = series[0].t, tMax = series[series.length - 1].t;
+  const yVals = series.map(p => p.y);
+  const yMin  = Math.min(...yVals, lower - 2);
+  const yMax  = Math.max(...yVals, upper + 2);
+  const yPad  = Math.max((yMax - yMin) * 0.12, 1);
+  const yLo   = yMin - yPad, yHi = yMax + yPad;
+
+  const sx = (tv) => PAD.l + ((tv - tMin) / (tMax - tMin)) * innerW;
+  const sy = (yv) => PAD.t + (1 - (yv - yLo) / (yHi - yLo)) * innerH;
+
+  const upperSy = sy(upper), lowerSy = sy(lower), meanSy = sy(data.meanY);
+
+  // split series into colored segments
+  const segments = [];
+  let cur = null;
+  for (let i = 0; i < series.length; i++) {
+    const p = series[i];
+    const exceeded = p.y > upper || p.y < lower;
+    const col = exceeded ? C.warnBad : C.blue;
+    if (!cur || col !== cur.col) {
+      // carry last point for continuity
+      if (cur && cur.pts.length > 0) cur.pts.push(p);
+      cur = { col, pts: [] };
+      segments.push(cur);
+    }
+    cur.pts.push(p);
+  }
+  const toLine = (pts) => pts.map(p => `${sx(p.t).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
+
+  const tickInterval = tMax > 120 ? 30 : tMax > 60 ? 15 : 10;
+  const ticks = [];
+  for (let tv = Math.ceil(tMin / tickInterval) * tickInterval; tv <= tMax; tv += tickInterval) ticks.push(tv);
+
+  const shiftColor = shifts.total === 0 ? C.warnOk : shifts.total < 5 ? C.warnMid : C.warnBad;
+
+  return (
+    <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 14px 10px" }}>
+      {/* header */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, letterSpacing:2 }}>CoG Y · {t.cogAP.toUpperCase()}</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.blue }}>ø {data.meanY.toFixed(1)}</span>
+      </div>
+
+      {/* chart */}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", overflow:"visible" }}>
+        <defs>
+          <filter id="lglow">
+            <feGaussianBlur stdDeviation="1.5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="wglow">
+            <feGaussianBlur stdDeviation="2" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <clipPath id="plotClip">
+            <rect x={PAD.l} y={PAD.t} width={innerW} height={innerH}/>
+          </clipPath>
+        </defs>
+
+        {/* threshold zone fill */}
+        <rect x={PAD.l} y={upperSy} width={innerW} height={lowerSy - upperSy}
+          fill={`${C.green}08`} clipPath="url(#plotClip)"/>
+
+        {/* grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map(f => {
+          const yv = yLo + f * (yHi - yLo);
+          const yp = sy(yv);
+          return (
+            <g key={f}>
+              <line x1={PAD.l} y1={yp} x2={W - PAD.r} y2={yp} stroke={C.borderSub} strokeWidth="0.5"/>
+              <text x={PAD.l - 3} y={yp + 3} textAnchor="end" fontFamily="DM Mono" fontSize="7" fill={C.textMute}>{yv.toFixed(0)}</text>
+            </g>
+          );
+        })}
+
+        {/* x ticks */}
+        {ticks.map(tv => (
+          <g key={tv}>
+            <line x1={sx(tv)} y1={PAD.t + innerH} x2={sx(tv)} y2={PAD.t + innerH + 3} stroke={C.navy} strokeWidth="0.8"/>
+            <text x={sx(tv)} y={H - 4} textAnchor="middle" fontFamily="DM Mono" fontSize="7" fill={C.textMute}>{tv}s</text>
+          </g>
+        ))}
+
+        {/* mean line */}
+        <line x1={PAD.l} y1={meanSy} x2={W - PAD.r} y2={meanSy}
+          stroke={`${C.cogLine}44`} strokeWidth="1" strokeDasharray="4 4"/>
+
+        {/* threshold lines */}
+        <line x1={PAD.l} y1={upperSy} x2={W - PAD.r} y2={upperSy}
+          stroke={`${C.warnBad}99`} strokeWidth="1" strokeDasharray="3 4"/>
+        <line x1={PAD.l} y1={lowerSy} x2={W - PAD.r} y2={lowerSy}
+          stroke={`${C.warnBad}99`} strokeWidth="1" strokeDasharray="3 4"/>
+        {/* threshold labels */}
+        <text x={W - PAD.r + 2} y={upperSy + 3} fontFamily="DM Mono" fontSize="6.5" fill={`${C.warnBad}aa`}>+{threshold}</text>
+        <text x={W - PAD.r + 2} y={lowerSy + 3} fontFamily="DM Mono" fontSize="6.5" fill={`${C.warnBad}aa`}>-{threshold}</text>
+
+        {/* signal – colored segments */}
+        {segments.map((seg, i) => (
+          <polyline key={i} points={toLine(seg.pts)} fill="none"
+            stroke={seg.col} strokeWidth={seg.col === C.warnBad ? 2 : 1.5}
+            strokeLinejoin="round" strokeLinecap="round"
+            filter={seg.col === C.warnBad ? "url(#wglow)" : "url(#lglow)"}
+            clipPath="url(#plotClip)" opacity={seg.col === C.warnBad ? 0.95 : 0.85}/>
+        ))}
+
+        {/* axes */}
+        <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + innerH} stroke={C.navy} strokeWidth="1"/>
+        <line x1={PAD.l} y1={PAD.t + innerH} x2={W - PAD.r} y2={PAD.t + innerH} stroke={C.navy} strokeWidth="1"/>
+      </svg>
+
+      <div style={{ display:"flex", justifyContent:"space-between", marginTop:2, marginBottom:12 }}>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:7, color:C.textMute }}>{t.cogFront}</span>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:7, color:C.textMute }}>{t.cogRear}</span>
+      </div>
+
+      {/* shift stats */}
+      <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:12, display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8, alignItems:"center" }}>
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textMute, letterSpacing:1, marginBottom:4 }}>{t.cogThreshold}</div>
+          <div style={{ fontFamily:"'Bebas Neue'", fontSize:22, color:C.textSec, lineHeight:1 }}>± {threshold}</div>
+        </div>
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textMute, letterSpacing:1, marginBottom:4 }}>{t.cogShiftsUp}</div>
+          <div style={{ fontFamily:"'Bebas Neue'", fontSize:28, color:C.warnBad, lineHeight:1 }}>{shifts.shiftsUp}</div>
+        </div>
+        <div style={{ textAlign:"center" }}>
+          <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textMute, letterSpacing:1, marginBottom:4 }}>{t.cogShiftsDown}</div>
+          <div style={{ fontFamily:"'Bebas Neue'", fontSize:28, color:C.warnBad, lineHeight:1 }}>{shifts.shiftsDown}</div>
+        </div>
+        <div style={{ textAlign:"center", background:C.bgPage, borderRadius:8, padding:"8px 4px" }}>
+          <div style={{ fontFamily:"'DM Mono'", fontSize:8, color:C.textMute, letterSpacing:1, marginBottom:4 }}>{t.cogShifts}</div>
+          <div style={{ fontFamily:"'Bebas Neue'", fontSize:32, color:shiftColor, lineHeight:1 }}>{shifts.total}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function SaddleHeatmap({ data }) {
   const { dim, points, meanX, meanY, stdX, stdY } = data;
   const hm = buildHeatmap(points, dim);
@@ -290,6 +471,7 @@ function CogScreen({ t }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [threshold, setThreshold] = useState(20);
   const inputRef = useRef(null);
 
   const handleFile = useCallback((file) => {
@@ -398,6 +580,21 @@ function CogScreen({ t }) {
       {/* LR balance bar */}
       <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px" }}>
         <LRBar bias={data.lrBias} t={t}/>
+      </div>
+
+      {/* Y over time */}
+      <CogYTimePlot data={data} threshold={threshold} t={t}/>
+
+      {/* threshold control */}
+      <div style={{ background:C.bgCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+        <span style={{ fontFamily:"'DM Mono'", fontSize:9, color:C.textMute, letterSpacing:2 }}>{t.cogThreshold.toUpperCase()}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <button onClick={() => setThreshold(v => Math.max(1, v - 1))}
+            style={{ background:C.bgPage, border:`1px solid ${C.border}`, borderRadius:6, width:32, height:32, fontFamily:"'DM Mono'", fontSize:16, color:C.textSec, cursor:"pointer" }}>−</button>
+          <span style={{ fontFamily:"'Bebas Neue'", fontSize:28, color:C.textPri, minWidth:40, textAlign:"center" }}>± {threshold}</span>
+          <button onClick={() => setThreshold(v => Math.min(50, v + 1))}
+            style={{ background:C.bgPage, border:`1px solid ${C.border}`, borderRadius:6, width:32, height:32, fontFamily:"'DM Mono'", fontSize:16, color:C.textSec, cursor:"pointer" }}>+</button>
+        </div>
       </div>
     </div>
   );
